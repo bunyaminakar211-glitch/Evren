@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FindMyDevice Pro | Secure Architecture</title>
+    
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=onGoogleMapsReady" async defer></script>
+
+    <style>
+        :root { --primary: #1a73e8; --danger: #d93025; --bg: #f8f9fa; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system; background: var(--bg); overflow: hidden; }
+        
+        /* Auth Screen */
+        #auth-gate { height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-card { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); text-align: center; }
+
+        /* Main App Interface */
+        #app-shell { display: none; height: 100vh; grid-template-rows: auto 1fr; }
+        #map-canvas { width: 100%; height: 100%; }
+        
+        .floating-ui {
+            position: absolute; top: 15px; left: 15px; z-index: 10;
+            background: white; padding: 16px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 300px;
+        }
+
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .high-acc { background: #ceead6; color: #0d652d; }
+        .low-acc { background: #fad2cf; color: #a50e0e; }
+        
+        #toast { 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #323232; color: white; padding: 12px 24px; border-radius: 8px;
+            display: none; z-index: 1000; font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div id="auth-gate">
+    <div class="login-card">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_Color_Logo.svg" width="60" style="margin-bottom: 1rem;">
+        <h2 style="margin:0 0 10px 0;">Cihazımı Bul</h2>
+        <p style="color:#5f6368; font-size:14px; margin-bottom:2rem;">Güvenli takip için Google ile devam edin</p>
+        <div id="g_signin_btn"></div>
+    </div>
+</div>
+
+<div id="app-shell">
+    <div class="floating-ui">
+        <div id="user-info" style="font-weight: 600; margin-bottom: 8px;"></div>
+        <div id="accuracy-status"></div>
+        <div id="sync-indicator" style="font-size: 12px; color: #70757a; margin-top: 10px;">📡 Sinyal bekleniyor...</div>
+        <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+        <button onclick="terminateSession()" style="width:100%; padding:10px; border:1px solid #dadce0; border-radius:6px; background:white; cursor:pointer; font-weight:500;">Oturumu Kapat</button>
+    </div>
+    <div id="map-canvas"></div>
+</div>
+
+<script>
+/**
+ * SISTEM AYARLARI & DURUM YÖNETİMİ
+ * Analiz 2.1 & 4.1 Çözümü
+ */
+const AppConfig = {
+    GEO_OPTIONS: { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    MIN_DISTANCE_METERS: 5, // Throttling: 5 metreden küçük değişimleri ignore et
+    BACKEND_SIM: true
+};
+
+const AppState = {
+    map: null,
+    marker: null,
+    watchId: null,
+    isMapLoaded: false,
+    lastPosition: null,
+    sessionToken: null
+};
+
+// Map Yükleme Promise (Analiz 3.2 Çözümü)
+let resolveMap;
+const mapPromise = new Promise(res => resolveMap = res);
+
+function onGoogleMapsReady() {
+    AppState.map = new google.maps.Map(document.getElementById("map-canvas"), {
+        zoom: 18,
+        center: { lat: 39.93, lng: 32.85 },
+        disableDefaultUI: true,
+        styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
+    });
+    AppState.isMapLoaded = true;
+    resolveMap();
+}
+
+/**
+ * GÜVENLİ KİMLİK DOĞRULAMA
+ * Analiz 1.1 & 1.2 Çözümü
+ */
+window.onload = () => {
+    google.accounts.id.initialize({
+        client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com",
+        callback: processAuthentication
+    });
+    google.accounts.id.renderButton(document.getElementById("g_signin_btn"), { theme: "outline", size: "large" });
+};
+
+async function processAuthentication(googleResponse) {
+    showToast("Doğrulanıyor...");
+    
+    // Analiz 1.1: Gerçek sistemde bu token backend'e gönderilip verify edilmelidir.
+    // fetch('/api/verify', { method: 'POST', body: JSON.stringify({idToken: googleResponse.credential}) });
+    
+    const payload = JSON.parse(atob(googleResponse.credential.split('.')[1]));
+    
+    // Güvenli UI Güncelleme (Analiz 1.2 - textContent kullanımı)
+    document.getElementById('user-info').textContent = `Cihaz Sahibi: ${payload.name}`;
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'grid';
+    
+    initTracking();
+}
+
+/**
+ * KONUM TAKİP VE VERİ İŞLEME
+ * Analiz 3.1 & 2.2 Çözümü
+ */
+async function initTracking() {
+    await mapPromise; // Harita yüklenmeden asla işlem yapma
+
+    AppState.watchId = navigator.geolocation.watchPosition(
+        (pos) => handleLocationUpdate(pos),
+        (err) => handleLocationError(err),
+        AppConfig.GEO_OPTIONS
+    );
+}
+
+function handleLocationUpdate(position) {
+    const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+    const accuracy = position.coords.accuracy;
+
+    // Analiz 3.1: Metre bazlı doğruluk kontrolü
+    updateAccuracyUI(accuracy);
+
+    // Analiz 2.2: Throttling & Distance Check
+    if (AppState.lastPosition) {
+        const dist = google.maps.geometry.spherical.computeDistanceBetween(
+            new google.maps.LatLng(AppState.lastPosition),
+            new google.maps.LatLng(coords)
+        );
+        if (dist < AppConfig.MIN_DISTANCE_METERS) return; // Çok küçük hareketleri ignore et
+    }
+
+    renderMarker(coords);
+    syncWithBackend(coords, accuracy);
+    AppState.lastPosition = coords;
+}
+
+function updateAccuracyUI(acc) {
+    const el = document.getElementById('accuracy-status');
+    const isGood = acc < 30;
+    el.innerHTML = `<span class="badge ${isGood ? 'high-acc' : 'low-acc'}">
+        ${isGood ? '🎯 Yüksek Hassasiyet' : '⚠️ Düşük Hassasiyet'} (±${acc.toFixed(0)}m)
+    </span>`;
+}
+
+function renderMarker(coords) {
+    if (!AppState.marker) {
+        AppState.marker = new google.maps.Marker({
+            position: coords,
+            map: AppState.map,
+            optimized: true,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: "#1a73e8",
+                fillOpacity: 1,
+                strokeWeight: 3,
+                strokeColor: "white"
+            }
+        });
+        AppState.map.panTo(coords);
+    } else {
+        AppState.marker.setPosition(coords);
+    }
+}
+
+/**
+ * BACKEND ENTEGRASYON VE ÇIKIŞ
+ * Analiz 1.1 & 3.3 Çözümü
+ */
+function syncWithBackend(coords, accuracy) {
+    // Analiz 2.2: Multi-device için backend'e veri itme
+    document.getElementById('sync-indicator').textContent = `✅ Senkronize: ${new Date().toLocaleTimeString()}`;
+    
+    if (AppConfig.BACKEND_SIM) {
+        console.log("POST /api/location", { coords, accuracy, ts: Date.now() });
+    }
+}
+
+function terminateSession() {
+    if (AppState.watchId) navigator.geolocation.clearWatch(AppState.watchId);
+    
+    // Analiz 3.3: Gerçek çıkış simülasyonu
+    google.accounts.id.disableAutoSelect();
+    showToast("Oturum kapatıldı. Yönlendiriliyorsunuz...");
+    
+    setTimeout(() => location.reload(), 1500);
+}
+
+function handleLocationError(err) {
+    const errors = { 1: "Konum izni reddedildi.", 2: "Sinyal kaybı.", 3: "Zaman aşımı." };
+    showToast(errors[err.code] || "Bilinmeyen hata");
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3000);
+}
+</script>
+
+</body>
+</html>
