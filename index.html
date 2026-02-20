@@ -1,228 +1,407 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FindMyDevice Pro | Secure Architecture</title>
-    
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=onGoogleMapsReady" async defer></script>
-
-    <style>
-        :root { --primary: #1a73e8; --danger: #d93025; --bg: #f8f9fa; }
-        body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system; background: var(--bg); overflow: hidden; }
-        
-        /* Auth Screen */
-        #auth-gate { height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .login-card { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); text-align: center; }
-
-        /* Main App Interface */
-        #app-shell { display: none; height: 100vh; grid-template-rows: auto 1fr; }
-        #map-canvas { width: 100%; height: 100%; }
-        
-        .floating-ui {
-            position: absolute; top: 15px; left: 15px; z-index: 10;
-            background: white; padding: 16px; border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 300px;
-        }
-
-        .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-        .high-acc { background: #ceead6; color: #0d652d; }
-        .low-acc { background: #fad2cf; color: #a50e0e; }
-        
-        #toast { 
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: #323232; color: white; padding: 12px 24px; border-radius: 8px;
-            display: none; z-index: 1000; font-size: 14px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BPDT ∞ ACCESS DENIED</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+    :root {
+      --neon-red: #ff004d;
+      --neon-green: #00ff41;
+      --dark-bg: #0a0a0a;
+    }
+    body {
+      margin: 0;
+      font-family: 'VT323', monospace;
+      background: var(--dark-bg);
+      color: var(--neon-green);
+      overflow-x: hidden;
+      height: 100vh;
+    }
+    #matrix-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -2;
+      opacity: 0.18;
+    }
+    .scanline {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(to bottom, transparent 50%, rgba(0,255,65,0.04) 50%, transparent);
+      background-size: 100% 6px;
+      animation: scan 10s linear infinite;
+      z-index: -1;
+    }
+    @keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+    .glitch { animation: glitch 5s infinite; }
+    @keyframes glitch {
+      0%,100% { text-shadow: 2px 0 var(--neon-red), -2px 0 var(--neon-green); }
+      20% { text-shadow: -4px 0 var(--neon-red), 4px 0 var(--neon-green); transform: skew(4deg); }
+      40% { text-shadow: 4px 0 var(--neon-red), -4px 0 var(--neon-green); transform: skew(-4deg); }
+    }
+    #bpdt-logo {
+      font-size: clamp(7rem, 20vw, 14rem);
+      text-shadow: 0 0 40px var(--neon-red), 0 0 80px var(--neon-green);
+      animation: flicker 4s infinite alternate;
+    }
+    @keyframes flicker {
+      0%,18%,22%,25%,53%,57%,100% { opacity: 1; }
+      20%,24%,55% { opacity: 0.35; }
+    }
+    .terminal-input {
+      background: rgba(0,0,0,0.75);
+      border: 3px solid var(--neon-green);
+      box-shadow: 0 0 35px rgba(0,255,65,0.35);
+    }
+    .drawer {
+      transition: transform 0.55s cubic-bezier(0.25, 0.8, 0.25, 1);
+      background: linear-gradient(135deg, #000 0%, #0a1a0a 100%);
+    }
+    .log-line { animation: fadeIn 0.4s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+  </style>
 </head>
 <body>
 
-<div id="toast"></div>
+  <!-- Matrix yağmur -->
+  <canvas id="matrix-bg"></canvas>
+  <div class="scanline"></div>
 
-<div id="auth-gate">
-    <div class="login-card">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_Color_Logo.svg" width="60" style="margin-bottom: 1rem;">
-        <h2 style="margin:0 0 10px 0;">Cihazımı Bul</h2>
-        <p style="color:#5f6368; font-size:14px; margin-bottom:2rem;">Güvenli takip için Google ile devam edin</p>
-        <div id="g_signin_btn"></div>
+  <!-- CloudFlare -->
+  <div id="cf" class="fixed inset-0 bg-black z-[9999] flex items-center justify-center">
+    <div class="text-center glitch">
+      <div class="text-[--neon-red] text-8xl font-black animate-pulse">CLOUDFLARE</div>
+      <p class="mt-6 text-2xl tracking-widest">GATEWAY AUTHENTICATION... ∞ ADANA GÜVENİM ∞</p>
     </div>
-</div>
+  </div>
 
-<div id="app-shell">
-    <div class="floating-ui">
-        <div id="user-info" style="font-weight: 600; margin-bottom: 8px;"></div>
-        <div id="accuracy-status"></div>
-        <div id="sync-indicator" style="font-size: 12px; color: #70757a; margin-top: 10px;">📡 Sinyal bekleniyor...</div>
-        <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
-        <button onclick="terminateSession()" style="width:100%; padding:10px; border:1px solid #dadce0; border-radius:6px; background:white; cursor:pointer; font-weight:500;">Oturumu Kapat</button>
+  <!-- AUTH – Terminal Style -->
+  <div id="auth" class="hidden min-h-screen flex items-center justify-center p-6 relative z-10">
+    <div class="w-full max-w-lg terminal-input rounded-2xl p-12 shadow-2xl border-t-4 border-[--neon-green]">
+      <div id="bpdt-logo" class="text-center mb-12 select-none glitch">BPDT</div>
+      <div class="text-4xl mb-10 text-center tracking-widest glitch">SYSTEM ACCESS</div>
+
+      <div id="register-panel">
+        <input id="reg-email" type="email" placeholder="USER@DOMAIN.TLD" class="w-full bg-black/70 p-6 mb-6 text-2xl text-[--neon-green] border-b-2 border-[--neon-green]/60 outline-none">
+        <input id="reg-pass" type="password" placeholder="••••••••" class="w-full bg-black/70 p-6 mb-8 text-2xl text-[--neon-green] border-b-2 border-[--neon-green]/60 outline-none">
+        <button onclick="validateAndRegister()" class="w-full bg-[--neon-green]/20 hover:bg-[--neon-green]/40 text-[--neon-green] py-6 text-2xl font-bold rounded-lg transition">>> REGISTER + VERIFY <<</button>
+        <p class="text-center mt-8 text-[--neon-red] cursor-pointer text-xl" onclick="toggleForms()">>> EXISTING ACCESS? LOGIN <<</p>
+      </div>
+
+      <div id="login-panel" class="hidden">
+        <input id="login-email" type="email" placeholder="USER@DOMAIN.TLD" class="w-full bg-black/70 p-6 mb-6 text-2xl text-[--neon-green] border-b-2 border-[--neon-green]/60 outline-none">
+        <input id="login-pass" type="password" placeholder="••••••••" class="w-full bg-black/70 p-6 mb-8 text-2xl text-[--neon-green] border-b-2 border-[--neon-green]/60 outline-none">
+        <button onclick="handleLogin()" class="w-full bg-[--neon-green]/20 hover:bg-[--neon-green]/40 text-[--neon-green] py-6 text-2xl font-bold rounded-lg transition">>> AUTHENTICATE <<</button>
+        <p class="text-center mt-8 text-[--neon-red] cursor-pointer text-xl" onclick="toggleForms()">>> NEW ACCESS REQUEST <<</p>
+      </div>
     </div>
-    <div id="map-canvas"></div>
-</div>
+  </div>
 
-<script>
-/**
- * SISTEM AYARLARI & DURUM YÖNETİMİ
- * Analiz 2.1 & 4.1 Çözümü
- */
-const AppConfig = {
-    GEO_OPTIONS: { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
-    MIN_DISTANCE_METERS: 5, // Throttling: 5 metreden küçük değişimleri ignore et
-    BACKEND_SIM: true
-};
+  <!-- MAIN DASHBOARD -->
+  <div id="main" class="hidden relative z-10">
+    <header class="fixed top-0 inset-x-0 h-16 bg-black/85 backdrop-blur-lg border-b border-[--neon-green]/40 z-50 flex items-center px-6">
+      <button onclick="toggleDrawer()" class="text-4xl hover:text-[--neon-red] transition">≡</button>
+      <div class="flex-1 text-center text-3xl font-black tracking-[0.6em] glitch">BPDT CORE</div>
+      <div class="text-[--neon-green] text-lg font-semibold">7/24 LIVE</div>
+    </header>
 
-const AppState = {
-    map: null,
-    marker: null,
-    watchId: null,
-    isMapLoaded: false,
-    lastPosition: null,
-    sessionToken: null
-};
+    <!-- DRAWER – SMS Bomber ekstra vurgulandı -->
+    <div id="drawer" class="drawer fixed inset-y-0 left-0 w-80 -translate-x-full z-50 overflow-y-auto border-r border-[--neon-green]/50 bg-black/95">
+      <div class="p-8">
+        <div onclick="toggleDrawer()" class="text-right text-5xl cursor-pointer mb-12 text-[--neon-red]">✖</div>
+        <div id="bpdt-logo" class="text-center mb-16 glitch">BPDT</div>
+        <nav class="space-y-12 text-2xl font-bold">
+          <div class="cursor-pointer hover:text-[--neon-red] transition" onclick="toggleDrawer()">DEVICE LOCATE</div>
+          <div class="cursor-pointer hover:text-[--neon-red] transition" onclick="toggleDrawer()">WEATHER STREAM</div>
+          <div class="cursor-pointer hover:text-[--neon-red] transition" onclick="toggleDrawer()">LIVE GPS TRACK</div>
+          <div class="cursor-pointer hover:text-[--neon-red] transition" onclick="toggleDrawer()">IP TRACE</div>
+          <div class="cursor-pointer text-[--neon-red] animate-pulse text-3xl" onclick="toggleDrawer()">→ SMS BOMBER 💥</div>
+        </nav>
+      </div>
+    </div>
 
-// Map Yükleme Promise (Analiz 3.2 Çözümü)
-let resolveMap;
-const mapPromise = new Promise(res => resolveMap = res);
+    <main class="pt-20 px-6 pb-16 space-y-12">
+      <!-- Weather Card -->
+      <section class="bg-black/70 rounded-3xl p-8 border border-[--neon-green]/30">
+        <div class="flex justify-between items-start">
+          <div>
+            <div id="temp" class="text-7xl font-black">--°C</div>
+            <div id="city" class="text-3xl mt-2">DİYARBAKIR</div>
+          </div>
+          <div class="text-right">
+            <div id="cond" class="text-4xl">LOADING...</div>
+            <div class="text-lg text-[--neon-green]/70 mt-1">REAL-TIME FEED</div>
+          </div>
+        </div>
+      </section>
 
-function onGoogleMapsReady() {
-    AppState.map = new google.maps.Map(document.getElementById("map-canvas"), {
-        zoom: 18,
-        center: { lat: 39.93, lng: 32.85 },
-        disableDefaultUI: true,
-        styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
+      <!-- Live GPS Panel -->
+      <section id="gps-panel" class="hidden bg-black/80 border-4 border-[--neon-red]/60 rounded-3xl p-8">
+        <div class="flex justify-between items-center mb-6">
+          <div class="text-[--neon-red] text-4xl font-black flex items-center gap-4">
+            <span>📍</span> LIVE GPS ACTIVE
+          </div>
+          <div class="flex gap-4">
+            <button onclick="stopGPS()" class="bg-[--neon-red]/70 hover:bg-[--neon-red] px-8 py-4 rounded-2xl font-bold">STOP</button>
+            <button onclick="clearTrail()" class="bg-zinc-800 hover:bg-zinc-700 px-8 py-4 rounded-2xl font-bold">CLEAR TRAIL</button>
+          </div>
+        </div>
+        <div id="gps-stats" class="grid grid-cols-2 gap-6 text-lg font-mono"></div>
+      </section>
+
+      <!-- Map -->
+      <div class="relative rounded-3xl overflow-hidden border border-[--neon-green]/40 shadow-2xl">
+        <div id="map" class="h-96 md:h-[500px]"></div>
+        <div class="absolute bottom-6 left-6 right-6 flex flex-wrap gap-4 justify-center md:justify-between">
+          <button onclick="startGPS()" class="bg-[--neon-red] hover:bg-red-700 px-10 py-6 rounded-3xl font-bold text-xl shadow-lg">START LIVE TRACK 📍</button>
+          <button onclick="getIP()" class="bg-[--neon-green]/30 hover:bg-[--neon-green]/50 px-10 py-6 rounded-3xl font-bold text-xl">IP TRACE</button>
+          <button onclick="toggleFullscreen()" class="bg-black/70 hover:bg-zinc-800 px-10 py-6 rounded-3xl font-bold text-xl">FULL SCREEN</button>
+        </div>
+      </div>
+
+      <!-- SMS Bomber -->
+      <section class="bg-black/80 border-2 border-[--neon-red]/60 rounded-3xl p-10">
+        <h2 class="text-[--neon-red] text-5xl font-black mb-8 text-center glitch">SMS BOMBER 💥💥💥</h2>
+        <input id="phone" maxlength="11" placeholder="5XXXXXXXXX" class="w-full bg-black p-6 rounded-2xl text-3xl text-center border border-[--neon-green]/50 mb-6">
+        <input id="count" type="number" value="50" min="1" max="1000" class="w-full bg-black p-6 rounded-2xl text-3xl text-center border border-[--neon-green]/50 mb-8">
+        <div class="grid grid-cols-2 gap-6 mb-8">
+          <button onclick="setMode('turbo')" id="turbo" class="py-6 font-black rounded-2xl bg-yellow-400/80 hover:bg-yellow-400 text-black transition">TURBO ⚡</button>
+          <button onclick="setMode('normal')" id="normal" class="py-6 font-black rounded-2xl bg-zinc-700 hover:bg-zinc-600 transition">NORMAL</button>
+        </div>
+        <button onclick="startBomb()" class="w-full py-10 bg-[--neon-red] hover:bg-red-700 text-4xl font-black rounded-3xl transition shadow-2xl">LAUNCH ATTACK 💯</button>
+        <div id="bomb-log" class="mt-10 h-80 overflow-auto bg-black/90 p-6 rounded-2xl text-lg font-mono space-y-2"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Matrix yağmur
+    const c = document.getElementById('matrix-bg');
+    const ctx = c.getContext('2d');
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+    const matrixChars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'.split('');
+    const font = 18;
+    const cols = c.width / font;
+    const drops = Array(Math.floor(cols)).fill(1);
+
+    function draw() {
+      ctx.fillStyle = 'rgba(10,10,10,0.06)';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.fillStyle = '#0f0';
+      ctx.font = font + 'px monospace';
+      drops.forEach((y, i) => {
+        const text = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+        ctx.fillText(text, i * font, y * font);
+        if (y * font > c.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      });
+    }
+    setInterval(draw, 45);
+
+    window.addEventListener('resize', () => {
+      c.width = window.innerWidth;
+      c.height = window.innerHeight;
     });
-    AppState.isMapLoaded = true;
-    resolveMap();
-}
 
-/**
- * GÜVENLİ KİMLİK DOĞRULAMA
- * Analiz 1.1 & 1.2 Çözümü
- */
-window.onload = () => {
-    google.accounts.id.initialize({
-        client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com",
-        callback: processAuthentication
+    // DOM cache
+    const els = {
+      cf: document.getElementById('cf'),
+      auth: document.getElementById('auth'),
+      main: document.getElementById('main'),
+      regPanel: document.getElementById('register-panel'),
+      loginPanel: document.getElementById('login-panel'),
+      map: document.getElementById('map'),
+      temp: document.getElementById('temp'),
+      cond: document.getElementById('cond'),
+      bombLog: document.getElementById('bomb-log'),
+      phone: document.getElementById('phone'),
+      count: document.getElementById('count'),
+      turboBtn: document.getElementById('turbo'),
+      normalBtn: document.getElementById('normal')
+    };
+
+    let mapInst, gpsMarker, accCircle, trail, watchId = null;
+    let coords = [];
+    let mode = 'normal';
+
+    // Auth forms toggle
+    function toggleForms() {
+      els.regPanel.classList.toggle('hidden');
+      els.loginPanel.classList.toggle('hidden');
+    }
+
+    // Drawer
+    function toggleDrawer() {
+      document.getElementById('drawer').classList.toggle('-translate-x-full');
+    }
+
+    // CloudFlare → Auth
+    setTimeout(() => {
+      els.cf.classList.add('hidden');
+      els.auth.classList.remove('hidden');
+      els.regPanel.classList.remove('hidden');
+      els.loginPanel.classList.add('hidden');
+    }, 2200);
+
+    // Register + Email Verify (Disify)
+    async function validateAndRegister() {
+      const email = els.regPanel.querySelector('#reg-email').value.trim();
+      const pass = els.regPanel.querySelector('#reg-pass').value.trim();
+      if (!email || !pass) return alert('E-posta ve şifre girin');
+
+      try {
+        const r = await fetch(`https://disify.com/api/email/${encodeURIComponent(email)}`);
+        const d = await r.json();
+        if (!d.format || d.disposable || !d.dns) return alert('Sahte / geçici mail!');
+        localStorage.setItem('bpdt_email', email);
+        localStorage.setItem('bpdt_pass', pass);
+        localStorage.setItem('bpdt_ok', '1');
+        alert('Doğrulandı → Giriş yap');
+        toggleForms();
+      } catch {
+        alert('Doğrulama hatası');
+      }
+    }
+
+    function handleLogin() {
+      const email = els.loginPanel.querySelector('#login-email').value.trim();
+      const pass = els.loginPanel.querySelector('#login-pass').value.trim();
+      if (email === localStorage.getItem('bpdt_email') &&
+          pass === localStorage.getItem('bpdt_pass') &&
+          localStorage.getItem('bpdt_ok') === '1') {
+        els.auth.classList.add('hidden');
+        els.main.classList.remove('hidden');
+        initAll();
+      } else {
+        alert('Hesap doğrulanmadı veya yanlış bilgi');
+      }
+    }
+
+    function initAll() {
+      initMap();
+      loadWeather();
+    }
+
+    function initMap() {
+      mapInst = L.map(els.map, { zoomControl: false }).setView([37.91, 40.23], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInst);
+    }
+
+    function startGPS() {
+      if (watchId) return;
+      if (!navigator.geolocation) return alert('GPS yok');
+      document.getElementById('gps-panel').classList.remove('hidden');
+      watchId = navigator.geolocation.watchPosition(p => {
+        const { latitude: lat, longitude: lon, accuracy, speed, altitude, heading } = p.coords;
+        const spd = speed ? (speed * 3.6).toFixed(1) : '0.0';
+        const alt = altitude ? altitude.toFixed(1) : '--';
+        const dir = heading ? heading.toFixed(0) + '°' : '--';
+        const t = new Date().toLocaleTimeString('tr-TR');
+
+        mapInst.flyTo([lat, lon], 19, {duration: 1.4});
+
+        gpsMarker ??= L.marker([lat, lon]).addTo(mapInst);
+        gpsMarker.setLatLng([lat, lon]);
+
+        accCircle ??= L.circle([lat, lon], {radius: accuracy, color: 'red', fillOpacity: 0.15}).addTo(mapInst);
+        accCircle.setLatLng([lat, lon]).setRadius(accuracy);
+
+        coords.push([lat, lon]);
+        trail ??= L.polyline(coords, {color: 'red', weight: 6}).addTo(mapInst);
+        trail.setLatLngs(coords);
+
+        document.getElementById('gps-stats').innerHTML = `
+          <div>Enlem: ${lat.toFixed(6)}</div>
+          <div>Boylam: ${lon.toFixed(6)}</div>
+          <div>Doğruluk: ±${accuracy.toFixed(0)}m</div>
+          <div>Hız: ${spd} km/h</div>
+          <div>Yükseklik: ${alt} m</div>
+          <div>Yön: ${dir}</div>
+          <div class="col-span-2 text-yellow-400">Son: ${t}</div>
+        `;
+      }, e => alert(e.message), {enableHighAccuracy: true, timeout: 5000});
+    }
+
+    function stopGPS() {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      document.getElementById('gps-panel').classList.add('hidden');
+    }
+
+    function clearTrail() {
+      coords = [];
+      if (trail) trail.setLatLngs([]);
+    }
+
+    async function loadWeather() {
+      try {
+        const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=37.91&longitude=40.23&current_weather=true');
+        const d = await r.json();
+        els.temp.textContent = Math.round(d.current_weather.temperature) + '°C';
+        els.cond.textContent = 'CANLI';
+      } catch {}
+    }
+
+    async function getIP() {
+      try {
+        const r = await fetch('https://ip-api.com/json/');
+        const d = await r.json();
+        if (d.status === 'success') {
+          mapInst.flyTo([d.lat, d.lon], 14);
+          alert(`IP: ${d.query}\nŞehir: ${d.city}\nISP: ${d.isp}`);
+        }
+      } catch {}
+    }
+
+    function toggleFullscreen() {
+      const m = els.map;
+      if (!document.fullscreenElement) m.requestFullscreen();
+      else document.exitFullscreen();
+    }
+
+    function setMode(m) {
+      mode = m;
+      els.turboBtn.classList.toggle('bg-yellow-400/80', m === 'turbo');
+      els.turboBtn.classList.toggle('bg-zinc-700', m !== 'turbo');
+      els.normalBtn.classList.toggle('bg-zinc-700', m === 'turbo');
+      els.normalBtn.classList.toggle('bg-yellow-400/80', m === 'normal');
+    }
+
+    function startBomb() {
+      const ph = els.phone.value.trim();
+      let cnt = Math.min(1000, Math.max(1, parseInt(els.count.value) || 1));
+      if (!ph.startsWith('5') || ph.length !== 11) return alert('Geçerli numara gir (5 ile başlasın)');
+
+      els.bombLog.innerHTML = `<div class="text-yellow-400 mb-4">BOMBA BAŞLATILDI - \( {mode.toUpperCase()} ( \){cnt} sms) 💥</div>`;
+      let i = 0;
+      const spd = mode === 'turbo' ? 60 : 220;
+      const iv = setInterval(() => {
+        i++;
+        const ln = document.createElement('div');
+        ln.className = 'log-line flex justify-between text-green-400';
+        ln.innerHTML = `<span>+${i} → ${ph}</span><span>OK 💯</span>`;
+        els.bombLog.appendChild(ln);
+        els.bombLog.scrollTop = els.bombLog.scrollHeight;
+        if (i >= cnt) {
+          clearInterval(iv);
+          const fin = document.createElement('div');
+          fin.className = 'mt-6 text-center text-3xl text-green-500 font-black';
+          fin.textContent = '←←← BİTTİ ∞';
+          els.bombLog.appendChild(fin);
+        }
+      }, spd);
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.getElementById('drawer').classList.add('-translate-x-full');
     });
-    google.accounts.id.renderButton(document.getElementById("g_signin_btn"), { theme: "outline", size: "large" });
-};
-
-async function processAuthentication(googleResponse) {
-    showToast("Doğrulanıyor...");
-    
-    // Analiz 1.1: Gerçek sistemde bu token backend'e gönderilip verify edilmelidir.
-    // fetch('/api/verify', { method: 'POST', body: JSON.stringify({idToken: googleResponse.credential}) });
-    
-    const payload = JSON.parse(atob(googleResponse.credential.split('.')[1]));
-    
-    // Güvenli UI Güncelleme (Analiz 1.2 - textContent kullanımı)
-    document.getElementById('user-info').textContent = `Cihaz Sahibi: ${payload.name}`;
-    document.getElementById('auth-gate').style.display = 'none';
-    document.getElementById('app-shell').style.display = 'grid';
-    
-    initTracking();
-}
-
-/**
- * KONUM TAKİP VE VERİ İŞLEME
- * Analiz 3.1 & 2.2 Çözümü
- */
-async function initTracking() {
-    await mapPromise; // Harita yüklenmeden asla işlem yapma
-
-    AppState.watchId = navigator.geolocation.watchPosition(
-        (pos) => handleLocationUpdate(pos),
-        (err) => handleLocationError(err),
-        AppConfig.GEO_OPTIONS
-    );
-}
-
-function handleLocationUpdate(position) {
-    const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
-    const accuracy = position.coords.accuracy;
-
-    // Analiz 3.1: Metre bazlı doğruluk kontrolü
-    updateAccuracyUI(accuracy);
-
-    // Analiz 2.2: Throttling & Distance Check
-    if (AppState.lastPosition) {
-        const dist = google.maps.geometry.spherical.computeDistanceBetween(
-            new google.maps.LatLng(AppState.lastPosition),
-            new google.maps.LatLng(coords)
-        );
-        if (dist < AppConfig.MIN_DISTANCE_METERS) return; // Çok küçük hareketleri ignore et
-    }
-
-    renderMarker(coords);
-    syncWithBackend(coords, accuracy);
-    AppState.lastPosition = coords;
-}
-
-function updateAccuracyUI(acc) {
-    const el = document.getElementById('accuracy-status');
-    const isGood = acc < 30;
-    el.innerHTML = `<span class="badge ${isGood ? 'high-acc' : 'low-acc'}">
-        ${isGood ? '🎯 Yüksek Hassasiyet' : '⚠️ Düşük Hassasiyet'} (±${acc.toFixed(0)}m)
-    </span>`;
-}
-
-function renderMarker(coords) {
-    if (!AppState.marker) {
-        AppState.marker = new google.maps.Marker({
-            position: coords,
-            map: AppState.map,
-            optimized: true,
-            icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 10,
-                fillColor: "#1a73e8",
-                fillOpacity: 1,
-                strokeWeight: 3,
-                strokeColor: "white"
-            }
-        });
-        AppState.map.panTo(coords);
-    } else {
-        AppState.marker.setPosition(coords);
-    }
-}
-
-/**
- * BACKEND ENTEGRASYON VE ÇIKIŞ
- * Analiz 1.1 & 3.3 Çözümü
- */
-function syncWithBackend(coords, accuracy) {
-    // Analiz 2.2: Multi-device için backend'e veri itme
-    document.getElementById('sync-indicator').textContent = `✅ Senkronize: ${new Date().toLocaleTimeString()}`;
-    
-    if (AppConfig.BACKEND_SIM) {
-        console.log("POST /api/location", { coords, accuracy, ts: Date.now() });
-    }
-}
-
-function terminateSession() {
-    if (AppState.watchId) navigator.geolocation.clearWatch(AppState.watchId);
-    
-    // Analiz 3.3: Gerçek çıkış simülasyonu
-    google.accounts.id.disableAutoSelect();
-    showToast("Oturum kapatıldı. Yönlendiriliyorsunuz...");
-    
-    setTimeout(() => location.reload(), 1500);
-}
-
-function handleLocationError(err) {
-    const errors = { 1: "Konum izni reddedildi.", 2: "Sinyal kaybı.", 3: "Zaman aşımı." };
-    showToast(errors[err.code] || "Bilinmeyen hata");
-}
-
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.style.display = 'block';
-    setTimeout(() => t.style.display = 'none', 3000);
-}
-</script>
-
+  </script>
 </body>
-</html>
+        </html>
